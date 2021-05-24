@@ -1,5 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -7,8 +5,10 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <time.h>
-#include "./record.h"
+#include "./utils/errorHandler.h"
+#include "./types/record.h"
  
+#define TRUE 1
 #define PORT 3535
 
 #define ORIGIN_INPUT 1
@@ -17,50 +17,43 @@
 #define SEND_REQUEST 4
 #define EXIT 5
 
-void handleError( char* msg ) {
-   perror( msg );
-   exit( EXIT_FAILURE );
-}
-
 int sendRequest( int clientfd, recordQuery_t queryParams ) {
-   if ( send( clientfd, &queryParams, sizeof( queryParams ), 0 ) < 0 )
-      handleError( "\n-->Error en send():" );
+   handleError( send( clientfd, &queryParams, sizeof( queryParams ), 0 ), "\n-->Error en send():" );
    
-   int res = 2;
-
-   recv( clientfd, &res, sizeof( res ), 0 );
-   printf( "%d\n", res );
-   // Enviar datos al servidor
-   // Recibir respuesta
-   
-   return 0;
+   float res = 0.0;
+   if ( recv( clientfd, &res, sizeof( res ), 0 ) < sizeof( res ) ) return -1;
+   return res;
 }
 
 int main( int argc, char *argv[] ) {
-   int clientfd, r;
-   int option;
+   int clientfd, r, option;
    recordQuery_t queryParams;
 
    struct sockaddr_in client;
    struct hostent *he;
 
-   char buffer[ 32 ];
-
-   clientfd = socket( AF_INET, SOCK_STREAM, 0 );
-
-   if ( clientfd < 0 )
-      handleError( "\n-->Error en socket()" );
-   
+   handleError( clientfd = socket( AF_INET, SOCK_STREAM, 0 ), "\n-->Error en socket()" );
+  
+   // Configuracion inicial del cliente 
    client.sin_family = AF_INET;
    client.sin_port = htons( PORT );
+
+   if ( argv[ 1 ] == NULL ) {
+      printf( "\nError: No se ha especificado la direccion IP del cliente\n" );
+      close( clientfd );
+      exit( -1 );
+   }
+
    inet_aton( argv[ 1 ], &client.sin_addr );
    
-   if ( connect( clientfd, ( struct sockaddr * ) &client, ( socklen_t ) sizeof( struct sockaddr ) ) < 0 )
-      handleError( "\n-->Error en connect()" );
+   handleError( 
+      connect( clientfd, ( struct sockaddr * ) &client, ( socklen_t ) sizeof( struct sockaddr ) ), 
+      "\n-->Error en connect()"
+   );
    
    do {
       system( "clear" );
-      printf( "Bienvenido (UwU)\n\n" );
+      printf( "Bienvenido \\(^u^)/\n\n" );
       printf( "Menu:\n");
       printf( "1. Ingresar origen\n" );
       printf( "2. Ingresar destino\n" );
@@ -72,7 +65,7 @@ int main( int argc, char *argv[] ) {
       
       switch ( option ) {
          case ORIGIN_INPUT:
-	         system( "clear" );
+            system( "clear" );
 	         printf( "\nIngrese ID del origen:  " );
 	         scanf( "%i", &queryParams.sourceId );
 		      break;
@@ -91,28 +84,31 @@ int main( int argc, char *argv[] ) {
 		      clock_t begin, end;
 		      begin = clock();
             
-            sendRequest( clientfd, queryParams );
-            // Recivir datos del servidor
-            //r = recv( clientfd, buffer, 32, 0);
+            float response = sendRequest( clientfd, queryParams );
+            
+            end = clock();
 
-		      end = clock();
+            if ( response >= 0 ) {
+               if ( response == 0 )
+                  printf( "\n\nNA\n" );
+               else
+                  printf( "\n\nTiempo de viaje medio: %.3f\n", response );
+               
+		         double duration = ( double ) ( end - begin ) / CLOCKS_PER_SEC;
+		         printf( "\n\nLa busqueda tomo %2.6f segundos.\n", duration );
+            } else
+               printf( "\n\nError al procesar la solicitud. Por favor intentelo de nuevo.\n");
 
-		      double duration = ( double ) ( end - begin ) / CLOCKS_PER_SEC;
-
-		      printf( "\n\nLa busqueda tomo %2.6f segundos.\n", duration );
-	         printf( "\nPresione Enter para continuar" );
-
+		      printf( "\n\nPresione Enter para continuar" );
 	         getchar();
 	         getchar();
 	         break;
 	      case EXIT:
             // Enviar opcion de finalizacion al servidor, cerrar socket de cliente
             queryParams.sourceId = 0;
-            if ( send( clientfd, &queryParams, sizeof( queryParams ), 0 ) < 0 )
-               handleError( "\n-->Error en send()" );
-
+            handleError( send( clientfd, &queryParams, sizeof( queryParams ), 0 ), "\n-->Error en send()" );
             close( clientfd );
-		      printf( "\nHasta luego (UwU)\n" );
+		      printf( "\nHasta luego, que tenga un buen dia :D\n\n" );
 	         exit ( 0 );
 	         break;
          default:
@@ -120,5 +116,5 @@ int main( int argc, char *argv[] ) {
 	         getchar();
 	         getchar();
       }
-   } while ( 1 );
+   } while ( TRUE );
 }

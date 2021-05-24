@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "record.h"
+#include "../types/record.h"
 
 #define TRUE 1
 #define FALSE 0
@@ -60,12 +60,12 @@ int main () {
    record_t * temp = ( record_t * ) malloc( sizeof( record_t ) );
    recordRead_t toWrite;
 
-   fileIn = fopen( "./unprocessedData.csv", "r" );
-   fileOutProcessedData = fopen( "./processedData.bin", "wb" );
-   fileOutHashTable = fopen( "./hashTable.bin", "wb" );
+   fileIn = fopen( "../data/unprocessedData.csv", "r" );
+   fileOutProcessedData = fopen( "../data/processedData.bin", "wb" );
+   fileOutHashTable = fopen( "../data/hashTable.bin", "wb" );
 
    if ( fileIn == NULL ) {
-      printf( "Error al leer el archivo 'unprocessedData'" );
+      printf( "Error al leer el archivo '../data/unprocessedData.bin'" );
       return -1;
    }
 
@@ -120,7 +120,7 @@ int main () {
       r = fwrite( &totalNumRecords, sizeof(totalNumRecords), 1, fileOutHashTable );
       
       if ( r <= 0 ) {
-         perror( "Error al escribir en el archivo 'hashTable.bin'" );
+         perror( "Error al escribir en el archivo '../data/hashTable.bin'" );
          break;
       }
 
@@ -134,7 +134,7 @@ int main () {
          r = fwrite( &toWrite, sizeof( toWrite ), 1, fileOutProcessedData );
 
          if ( r <= 0 ) {
-            perror( "Error al escribir en el archivo 'processedData.bin'" );
+            perror( "Error al escribir en el archivo '../data/processedData.bin'" );
             writeProcDataErr = TRUE;             
             break;
          }

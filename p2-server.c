@@ -1,6 +1,4 @@
 #include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -9,11 +7,12 @@
 #include <strings.h>
 #include <unistd.h>
 #include <pthread.h>
-#include "p2-searchRecord.h"
+#include "./search/searchRecord.h"
 
 #define PORT 3535
 #define MAX_CLIENTS 32
 
+pthread_mutex_t mutex;
 
 FILE *logFile;
 int serverfd;
@@ -24,51 +23,51 @@ struct clientInfo {
 };
 
 void signalInterruptHandler( int s ) {
+   printf( "\nSe detecto la señal de interrupcion. Finalizando el programa...\n");
+
+   pthread_mutex_destroy( &mutex );
    close( serverfd );
    fclose( logFile );
-   printf( "\nSe detecto la señal de interrupcion. Finalizando el programa...\n");
-   exit( 0 );
-}
 
-void handleError( int returnCode, char* msg ) {
-   if ( returnCode < 0 ) {
-      perror( msg );
-      exit( EXIT_FAILURE );
-   }
+   exit( 0 );
 }
 
 void * handleRequest( void *data ) {
    struct clientInfo *client = data;
    int clientfd = client->fd;
+   float errorCode = -1;
 
    recordQuery_t clientQuery;
 
    while ( TRUE ) {
-      recv( clientfd, &clientQuery, sizeof( clientQuery ), 0 );
+      if ( recv( clientfd, &clientQuery, sizeof( clientQuery ), 0 ) < sizeof( clientQuery ) ) {
+         send( clientfd, &errorCode, sizeof( errorCode ), 0 );
+         continue;
+      }
 
       if ( clientQuery.sourceId == 0 ) break;
       
       time_t _time = time( 0 );
       struct tm* localTime = localtime( &_time );
       //USAR MUTEX PARA EVITAR QUE TODOS ESCRIBAN EN EL ARCHIVO AL TIEMPO
+      pthread_mutex_lock( &mutex );
+
       fprintf(
          logFile,
-         "\nFecha [%04d%02d%02d%02d%02d%02d] Cliente [%s] [busqueda - %d - %d]\n",
+         "Fecha [%04d%02d%02d%02d%02d%02d] Cliente [%s] [busqueda - %d - %d - %d]\n",
          localTime->tm_year + 1900, localTime->tm_mon + 1, localTime->tm_mday,
          localTime->tm_hour, localTime->tm_min, localTime->tm_sec,
          inet_ntoa( client->socketInfo.sin_addr ),
          clientQuery.sourceId,
-         clientQuery.destId
+         clientQuery.destId,
+         clientQuery.hourOfDay
       );
+      
+      pthread_mutex_unlock( &mutex );
 
       // Esta funcion es importada del archivo p2-searchRecord.h
-      searchRecordMeanTravelTime( &clientQuery );
-      // Buscar la manera de que se escriban los datos (cerrando el flujo si o si)
-      //hacer la consulta
-      //iniciar proceso con memoria compartida o pipe entre proc no emparentados
-      //
-      int a = 1;
-      send( clientfd, &a, sizeof(a), 0 ); 
+      float result = searchRecordMeanTravelTime( &clientQuery );
+      send( clientfd, &result, sizeof( result ), 0 ); 
    }
   
    close( clientfd );
@@ -76,19 +75,18 @@ void * handleRequest( void *data ) {
 }
 
 int main() {
+   int opt = 1, threadIndex = 0;
    struct sigaction signalIntHandler;
 
-   int opt = 1;
-   
    struct sockaddr_in server;
    socklen_t socketSize;
 
    struct clientInfo client;
    
    pthread_t threadIds[ MAX_CLIENTS ];
-   int threadIndex = 0;
-   
-   logFile = fopen( "log.out", "w" );
+  
+   // logFile es un apuntador a FILE de ambito global 
+   logFile = fopen( "./output/log.out", "w" );
 
    if ( logFile == NULL ) {
       printf( "\nError creando archivo log" );
@@ -96,18 +94,18 @@ int main() {
    }
 
    // Codigo para manejar el comportamiento de la interrupcion
-   // ctrl + C (cierre del stream del archivo log y cierre del socket del servidor)
+   // ctrl + C (liberacion de recursos)
    signalIntHandler.sa_handler = signalInterruptHandler;
    sigemptyset( &signalIntHandler.sa_mask );
    signalIntHandler.sa_flags = 0;
    sigaction( SIGINT, &signalIntHandler, NULL );
-   //
+   // fin
 
    serverfd = socket( AF_INET, SOCK_STREAM, 0 );
 
    handleError( serverfd = socket( AF_INET, SOCK_STREAM, 0 ), "\n-->Error en socket()" ); 
 
-   //Server setup
+   // Configuración del servidor
    server.sin_family = AF_INET;
    server.sin_port = htons( PORT );
    server.sin_addr.s_addr = INADDR_ANY;
@@ -120,6 +118,8 @@ int main() {
       "\n-->Error en bind()"
    ); 
    handleError( listen( serverfd, MAX_CLIENTS ), "\n-->Error en listen()" );
+
+   pthread_mutex_init( &mutex, NULL );
 
    while ( TRUE ) {
       socketSize = sizeof( client.socketInfo );
