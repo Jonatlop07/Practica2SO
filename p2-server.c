@@ -49,7 +49,9 @@ void * handleRequest( void *data ) {
       
       time_t _time = time( 0 );
       struct tm* localTime = localtime( &_time );
-      //USAR MUTEX PARA EVITAR QUE TODOS ESCRIBAN EN EL ARCHIVO AL TIEMPO
+
+      // Usar mutex para evitar que todos los
+      // hilos escriban en el archivo al mismo tiempo
       pthread_mutex_lock( &mutex );
 
       fprintf(
@@ -114,7 +116,7 @@ int main() {
    setsockopt( serverfd, SOL_SOCKET, SO_REUSEADDR, ( char * ) &opt, sizeof( opt ) );
    
    handleError( 
-      bind( serverfd, ( struct sockaddr * ) &server, sizeof( struct sockaddr ) ),
+      bind( serverfd, ( struct sockaddr * ) &server, sizeof( struct sockaddr ) ), 
       "\n-->Error en bind()"
    ); 
    handleError( listen( serverfd, MAX_CLIENTS ), "\n-->Error en listen()" );
@@ -136,10 +138,7 @@ int main() {
          threadIndex = 0;
          
          while ( threadIndex < MAX_CLIENTS )
-            handleError(
-               pthread_join( threadIds[ threadIndex++ ], NULL ),
-               "\n-->Error en pthread_join()"
-            );
+            handleError( pthread_join( threadIds[ threadIndex++ ], NULL ), "\n-->Error en pthread_join()" );
 
          threadIndex = 0;
       }

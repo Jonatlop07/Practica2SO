@@ -18,9 +18,10 @@
 #define EXIT 5
 
 int sendRequest( int clientfd, recordQuery_t queryParams ) {
+   float res = 0.0;
+
    handleError( send( clientfd, &queryParams, sizeof( queryParams ), 0 ), "\n-->Error en send():" );
    
-   float res = 0.0;
    if ( recv( clientfd, &res, sizeof( res ), 0 ) < sizeof( res ) ) return -1;
    return res;
 }
@@ -66,23 +67,23 @@ int main( int argc, char *argv[] ) {
       switch ( option ) {
          case ORIGIN_INPUT:
             system( "clear" );
-	         printf( "\nIngrese ID del origen:  " );
-	         scanf( "%i", &queryParams.sourceId );
-		      break;
-	      case DEST_INPUT:
-	         system( "clear" );
-            printf( "\nIngrese ID del destino:  " );
-	         scanf( "%i", &queryParams.destId );
+            printf( "\nIngrese ID del origen:  " );
+            scanf( "%i", &queryParams.sourceId );
             break;
-	      case HOUR_INPUT:
-	         system( "clear" );
-		      printf( "\nIngrese hora del dia:  " );
-	         scanf( "%i", &queryParams.hourOfDay );
-		      break;
-	      case SEND_REQUEST:
-	         system( "clear" );
-		      clock_t begin, end;
-		      begin = clock();
+         case DEST_INPUT:
+            system( "clear" );
+            printf( "\nIngrese ID del destino:  " );
+            scanf( "%i", &queryParams.destId );
+            break;
+         case HOUR_INPUT:
+            system( "clear" );
+            printf( "\nIngrese hora del dia:  " );
+            scanf( "%i", &queryParams.hourOfDay );
+            break;
+         case SEND_REQUEST:
+            system( "clear" );
+            clock_t begin, end;
+            begin = clock();
             
             float response = sendRequest( clientfd, queryParams );
             
@@ -93,28 +94,29 @@ int main( int argc, char *argv[] ) {
                   printf( "\n\nNA\n" );
                else
                   printf( "\n\nTiempo de viaje medio: %.3f\n", response );
-               
-		         double duration = ( double ) ( end - begin ) / CLOCKS_PER_SEC;
-		         printf( "\n\nLa busqueda tomo %2.6f segundos.\n", duration );
+
+               double duration = ( double ) ( end - begin ) / CLOCKS_PER_SEC;
+               printf( "\n\nLa busqueda tomo %2.6f segundos.\n", duration );
             } else
                printf( "\n\nError al procesar la solicitud. Por favor intentelo de nuevo.\n");
 
-		      printf( "\n\nPresione Enter para continuar" );
-	         getchar();
-	         getchar();
-	         break;
-	      case EXIT:
+            printf( "\n\nPresione Enter para continuar" );
+            getchar();
+            getchar();
+            break;
+         case EXIT:
             // Enviar opcion de finalizacion al servidor, cerrar socket de cliente
             queryParams.sourceId = 0;
             handleError( send( clientfd, &queryParams, sizeof( queryParams ), 0 ), "\n-->Error en send()" );
+            
             close( clientfd );
-		      printf( "\nHasta luego, que tenga un buen dia :D\n\n" );
-	         exit ( 0 );
-	         break;
+            printf( "\nHasta luego, que tenga un buen dia :D\n\n" );
+            exit ( 0 );
+            break;
          default:
-	         printf( "\nError, vuelva a digitar la opcion\n" );
-	         getchar();
-	         getchar();
+            printf( "\nError, vuelva a digitar la opcion\n" );
+            getchar();
+            getchar();
       }
    } while ( TRUE );
 }
