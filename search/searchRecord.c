@@ -1,6 +1,9 @@
 #include "searchRecord.h"
 
 float searchRecordMeanTravelTime( recordQuery_t *queryData  ) {
+   if ( queryData->sourceId < 0 || queryData->destId < 0 || queryData->hourOfDay < 0 )
+      return -1;
+
    int hash, notFound = FALSE;
 
    recordRead_t aux;

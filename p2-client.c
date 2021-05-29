@@ -28,7 +28,7 @@ int sendRequest( int clientfd, recordQuery_t queryParams ) {
 
 int main( int argc, char *argv[] ) {
    int clientfd, r, option;
-   recordQuery_t queryParams;
+   recordQuery_t queryParams = { -1, 0, 0 };
 
    struct sockaddr_in client;
    struct hostent *he;
@@ -99,10 +99,6 @@ int main( int argc, char *argv[] ) {
                printf( "\n\nLa busqueda tomo %2.6f segundos.\n", duration );
             } else
                printf( "\n\nError al procesar la solicitud. Por favor intentelo de nuevo.\n");
-
-            printf( "\n\nPresione Enter para continuar" );
-            getchar();
-            getchar();
             break;
          case EXIT:
             // Enviar opcion de finalizacion al servidor, cerrar socket de cliente
@@ -115,8 +111,12 @@ int main( int argc, char *argv[] ) {
             break;
          default:
             printf( "\nError, vuelva a digitar la opcion\n" );
-            getchar();
-            getchar();
       }
+
+      if ( option >= ORIGIN_INPUT && option < EXIT && option != SEND_REQUEST )
+         printf( "\nSe ha recibido el dato\n" );
+      printf( "\n\nPresione una tecla para continuar" );
+      getchar();
+      getchar();
    } while ( TRUE );
 }
