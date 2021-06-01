@@ -11,11 +11,14 @@
 #include "./search/searchRecord.h"
 
 #define PORT 3535
-#define MAX_CLIENTS 3
-
-pthread_mutex_t mutex;
+#define BACKLOG 100
+#define MAX_CLIENTS 2
 
 pthread_t threads[ MAX_CLIENTS ];
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t threadCondition = PTHREAD_COND_INITIALIZER; 
+
+struct sockaddr_in clientInfo;
 
 FILE *logFile;
 int serverfd;
@@ -27,19 +30,15 @@ struct clientInfo {
 
 void signalInterruptHandler( int );
 void * threadFunction( void * );
-void * handleRequest( void * );
-
+void * handleRequest( /*client_t*/int );
 
 int main() {
    int opt = 1, threadIndex = 0;
+   int clientfd;
    struct sigaction signalIntHandler;
 
    struct sockaddr_in server;
    socklen_t socketSize;
-   
-   client_t client; 
-
-   pthread_t threadIds[ MAX_CLIENTS ];
   
    // logFile es un apuntador a FILE de ambito global 
    logFile = fopen( "./output/log.out", "w" );
@@ -56,8 +55,8 @@ int main() {
    signalIntHandler.sa_flags = 0;
    sigaction( SIGINT, &signalIntHandler, NULL );
    // fin
-
-   serverfd = socket( AF_INET, SOCK_STREAM, 0 );
+   while ( threadIndex < MAX_CLIENTS )
+      pthread_create( &threads[ threadIndex++ ], NULL, threadFunction, NULL );
 
    handleError( serverfd = socket( AF_INET, SOCK_STREAM, 0 ), "\n-->Error en socket()" ); 
 
@@ -73,45 +72,33 @@ int main() {
       bind( serverfd, ( struct sockaddr * ) &server, sizeof( struct sockaddr ) ), 
       "\n-->Error en bind()"
    ); 
-   handleError( listen( serverfd, MAX_CLIENTS ), "\n-->Error en listen()" );
-
-   // while ( threadIndex < MAX_CLIENTS )
-      // pthread_create( &threads[ threadIndex++ ], NULL, threadFunction, NULL );
-
-   pthread_mutex_init( &mutex, NULL );
+   handleError( listen( serverfd, BACKLOG ), "\n-->Error en listen()" );
 
    while ( TRUE ) {
-      socketSize = sizeof( struct sockaddr_in );
+      client_t *client = malloc( sizeof ( client_t ) );
 
       handleError( 
-         client.fd = accept( serverfd, ( struct sockaddr * ) client.socketInfo, &socketSize ),
+         clientfd = accept( serverfd, ( struct sockaddr * ) &clientInfo, &socketSize ),
          "\n-->Error en accept()"
       );
 
-      /*pthread_mutex_lock( &mutex );
-      enqueue( &client );
-      pthread_mutex_unlock( &mutex );*/
-
-      handleError(
-         pthread_create( &threadIds[ threadIndex++ ], NULL, handleRequest, ( void * ) &client ),
-         "\n-->Error en pthread_create()" 
-      );
-
-      if ( threadIndex >= MAX_CLIENTS ) {
-         threadIndex = 0;
-         
-         while ( threadIndex < MAX_CLIENTS )
-            handleError( pthread_join( threadIds[ threadIndex++ ], NULL ), "\n-->Error en pthread_join()" );
-
-         threadIndex = 0;
-      }
+      pthread_mutex_lock( &mutex );
+      enqueue( clientfd );
+      pthread_cond_signal( &threadCondition );
+      pthread_mutex_unlock( &mutex );
    }
 }
 
 void signalInterruptHandler( int s ) {
    printf( "\nSe detecto la señal de interrupcion. Finalizando el programa...\n");
 
-   pthread_mutex_destroy( &mutex );
+   for ( int i = 0; i < MAX_CLIENTS; ++i )
+      handleError(
+         pthread_cancel( threads[ i ] ),
+         "\n-->Error en pthread_join()"
+      );
+   //pthread_mutex_destroy( &mutex );
+   //handleError( pthread_cond_destroy( &threadCondition ), "\n-->Error en pthread_cond_destroy()" );
    close( serverfd );
    fclose( logFile );
 
@@ -119,26 +106,49 @@ void signalInterruptHandler( int s ) {
 }
 
 void * threadFunction( void * arg ) {
-   while ( TRUE ) {
-      client_t *client = dequeue();      
-      
-      if ( client != NULL ){
-         handleRequest( client );  
+   /*while ( TRUE ) {
+      client_t *client;
+      int * client;
+      pthread_mutex_lock( &mutex );
+
+      if ( ( client = dequeue() ) == NULL ) {
+         pthread_cond_wait( &threadCondition, &mutex );
+         client = dequeue();
       }
-   }
+
+      pthread_mutex_unlock( &mutex );     
+      
+      if ( client != NULL ) {
+         perror( "Cliente" );
+         handleRequest( client );
+      }
+   }*/
+       while (TRUE)
+    {
+        int clientfd;
+        pthread_mutex_lock(&mutex);
+        if ((clientfd = dequeue()) == -1){
+            pthread_cond_wait(&threadCondition,&mutex);
+            clientfd = dequeue();
+        }
+        pthread_mutex_unlock(&mutex);
+        if (clientfd != -1){
+            printf("Entrando a handle con: %d \n", clientfd);
+            handleRequest(clientfd);
+        }else{
+            sleep(1);
+        }
+    }
 
 }
 
-void * handleRequest( void *data ) {
-   client_t *client = data;
-   free( data );
-
-   int clientfd = client->fd;
+void * handleRequest( /*client_t *client*/int clientfd ) {
+   //int clientfd = client->fd;
    float errorCode = -1;
 
-   recordQuery_t clientQuery;
-
    while ( TRUE ) {
+      recordQuery_t clientQuery;
+
       if ( recv( clientfd, &clientQuery, sizeof( clientQuery ), 0 ) < sizeof( clientQuery ) ) {
          send( clientfd, &errorCode, sizeof( errorCode ), 0 );
          continue;
@@ -157,7 +167,7 @@ void * handleRequest( void *data ) {
          "Fecha [%04d%02d%02d%02d%02d%02d] Cliente [%s] [busqueda - %d - %d - %d]\n",
          localTime->tm_year + 1900, localTime->tm_mon + 1, localTime->tm_mday,
          localTime->tm_hour, localTime->tm_min, localTime->tm_sec,
-         inet_ntoa( client->socketInfo->sin_addr ),
+         inet_ntoa( clientInfo.sin_addr ),
          clientQuery.sourceId,
          clientQuery.destId,
          clientQuery.hourOfDay
@@ -168,6 +178,7 @@ void * handleRequest( void *data ) {
       float result = searchRecordMeanTravelTime( &clientQuery );
       send( clientfd, &result, sizeof( result ), 0 ); 
    }
-  
+
    close( clientfd );
+   //free( client );
 }

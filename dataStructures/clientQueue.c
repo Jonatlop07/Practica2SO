@@ -3,33 +3,38 @@
 node_t *head;
 node_t *tail;
 
-void enqueue( client_t *data ) {
+void enqueue( /*client_t *data*/ int data ) {
    node_t *newNode = malloc( sizeof( node_t ) );
    newNode->data = data;
    newNode->next = NULL;
    
-   if ( tail == NULL )
+   if ( head /*tail*/ == NULL ) {
       head = newNode;
-   else
+      tail = newNode;
+   } else {
       tail->next = newNode;
-
-   tail = newNode;
+      tail = newNode;
+   }
 }
 
-client_t* dequeue() {
+/*client_t**/int dequeue() {
    if ( head != NULL ) {
-      client_t *result = head->data;
+      /*client_t*/int result = head->data;
 
       node_t *aux = head;
-      head = head->next;
+      //head = head->next;
 
-      if ( head == NULL )
-         tail == NULL;
+      if ( head == tail /*NULL*/ ) {
+         head = NULL;
+         tail = NULL;
+      } else {
+         head = head->next;
+      }
       
       free( aux );
 
       return result;
    }
-   return NULL;
+   return -1;
 }
 

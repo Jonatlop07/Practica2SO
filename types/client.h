@@ -5,7 +5,7 @@
 
 typedef struct client {
    int fd;
-   struct sockaddr_in *socketInfo;
+   struct sockaddr_in socketInfo;
 } client_t;
 
 #endif
