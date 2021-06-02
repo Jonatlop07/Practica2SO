@@ -1,3 +1,11 @@
+/**
+ * @file p2-client.c
+ * @version 1.0
+ * @date 02/06/2021
+ * @author Jonathan López Castellanos - Víctor Alfredo Barragán Paez
+ * @title Programa del cliente
+ * @brief Programa que crea una conexión con el servidor y presenta una interfaz de consola para el ingreso de los datos del registro a buscar.
+ */
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -17,6 +25,12 @@
 #define SEND_REQUEST 4
 #define EXIT 5
 
+/**
+ * @brief sendRequest Función que envía la petición al servidor, con los datos de consulta, y retorna la respuesta.
+ * @param clientfd Descriptor del socket del cliente
+ * @param queryParams Variable de tipo estructura que almacena los datos de consulta del cliente.
+ * @return Respuesta del servidor (media de tiempos de viaje), -1 si ocurrió un error, 0 si el registro no se encontró.
+ */
 int sendRequest( int clientfd, recordQuery_t queryParams ) {
    float res = 0.0;
 
@@ -26,6 +40,10 @@ int sendRequest( int clientfd, recordQuery_t queryParams ) {
    return res;
 }
 
+/**
+ * @brief main Función principal. Crea un socket de cliente, realiza la conexión con el servidor y administra el ingreso y envío de los datos de consulta junto con la finalización de la conexión.
+ * @param argv El primer argumento de la entrada por terminal es la dirección IP del cliente que realizará la conexión con el servidor
+ */
 int main( int argc, char *argv[] ) {
    int clientfd, r, option;
    recordQuery_t queryParams = { -1, 0, 0 };

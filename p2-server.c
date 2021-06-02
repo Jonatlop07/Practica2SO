@@ -1,3 +1,11 @@
+/**
+ * @file p2-server.c
+ * @version 1.0
+ * @date 02/06/2021
+ * @author Jonathan López Castellanos - Víctor Alfredo Barragán Paez
+ * @title Programa del servidor
+ * @brief Programa que crea un socker que actúa como servidor y administra un máximo de 32 conexiones con clientes al mismo tiempo, además de procesar las solicitudes de estos.
+ */
 #include <signal.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -12,29 +20,47 @@
 
 #define PORT 3535
 #define BACKLOG 100
-#define MAX_CLIENTS 2
+#define MAX_CLIENTS 32
 
+/**
+ * @brief Arreglo de hilos pthread_t cuyo tamaño es el máximo de clientes que pueden establecer una conexión con el servidor al mismo tiempo.
+ */
 pthread_t threads[ MAX_CLIENTS ];
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t threadCondition = PTHREAD_COND_INITIALIZER; 
 
-struct sockaddr_in clientInfo;
+/**
+ * @brief Mutex empleado para evitar que los hilos y desencolen de la cola de clientes o escriban en el archivo log al mismo tiempo
+ */
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+/**
+ * @brief Condición de hilo empleada para bloquear el desencolamiento hasta que se encole un nuevo cliente
+ */
+pthread_cond_t threadCondition = PTHREAD_COND_INITIALIZER; 
 
 FILE *logFile;
 int serverfd;
 
-struct clientInfo {
-   int *fd;
-   struct sockaddr_in *socketInfo;
-};
-
+/**
+ * @brief signalInterruptHandler Función empleada para cerrar recursos una vez se envía la señal de interrupción control + C
+ */
 void signalInterruptHandler( int );
-void * threadFunction( void * );
-void * handleRequest( /*client_t*/int );
 
+/**
+ * @brief threadFunction Función que ejecuta cada hilo una vez es creado. Se encarga de desencolar clientes de la cola y hacer el llamado a la función que maneja la petición del cliente, siempre que exista en la cola.
+ */
+void * threadFunction( void * );
+
+/**
+ * @brief handleRequest Función que maneja la petición del cliente, recibe los datos de consulta y llama a la función encargada de buscar el registro solicitado y devolver el tiempo medio de viajes.
+ * @param Apuntador a la estructura client_t con los datos de conexión del cliente.
+ */
+void * handleRequest( client_t* );
+
+/**
+ * @brief main Función principal. Crea un socket de servidor, crea los hilos, acepta las conexiones entrantes y encola los clientes que se conectan al servidor.
+ */
 int main() {
    int opt = 1, threadIndex = 0;
-   int clientfd;
    struct sigaction signalIntHandler;
 
    struct sockaddr_in server;
@@ -76,14 +102,12 @@ int main() {
 
    while ( TRUE ) {
       client_t *client = malloc( sizeof ( client_t ) );
-
       handleError( 
-         clientfd = accept( serverfd, ( struct sockaddr * ) &clientInfo, &socketSize ),
+         client->fd = accept( serverfd, ( struct sockaddr * ) &client->socketInfo, &socketSize ),
          "\n-->Error en accept()"
       );
-
       pthread_mutex_lock( &mutex );
-      enqueue( clientfd );
+      enqueue( client );
       pthread_cond_signal( &threadCondition );
       pthread_mutex_unlock( &mutex );
    }
@@ -91,24 +115,18 @@ int main() {
 
 void signalInterruptHandler( int s ) {
    printf( "\nSe detecto la señal de interrupcion. Finalizando el programa...\n");
-
    for ( int i = 0; i < MAX_CLIENTS; ++i )
-      handleError(
-         pthread_cancel( threads[ i ] ),
-         "\n-->Error en pthread_join()"
-      );
-   //pthread_mutex_destroy( &mutex );
-   //handleError( pthread_cond_destroy( &threadCondition ), "\n-->Error en pthread_cond_destroy()" );
+      handleError( pthread_cancel( threads[ i ] ), "\n-->Error en pthread_join()" );
+   handleError( pthread_mutex_destroy( &mutex ), "\n-->Error en pthread_mutex_destroy()" );
+   handleError( pthread_cond_destroy( &threadCondition ), "\n-->Error en pthread_cond_destroy()" );
    close( serverfd );
    fclose( logFile );
-
    exit( 0 );
 }
 
 void * threadFunction( void * arg ) {
-   /*while ( TRUE ) {
+   while ( TRUE ) {
       client_t *client;
-      int * client;
       pthread_mutex_lock( &mutex );
 
       if ( ( client = dequeue() ) == NULL ) {
@@ -117,33 +135,14 @@ void * threadFunction( void * arg ) {
       }
 
       pthread_mutex_unlock( &mutex );     
-      
-      if ( client != NULL ) {
-         perror( "Cliente" );
-         handleRequest( client );
-      }
-   }*/
-       while (TRUE)
-    {
-        int clientfd;
-        pthread_mutex_lock(&mutex);
-        if ((clientfd = dequeue()) == -1){
-            pthread_cond_wait(&threadCondition,&mutex);
-            clientfd = dequeue();
-        }
-        pthread_mutex_unlock(&mutex);
-        if (clientfd != -1){
-            printf("Entrando a handle con: %d \n", clientfd);
-            handleRequest(clientfd);
-        }else{
-            sleep(1);
-        }
-    }
 
+      if ( client != NULL )
+         handleRequest( client );
+   }
 }
 
-void * handleRequest( /*client_t *client*/int clientfd ) {
-   //int clientfd = client->fd;
+void * handleRequest( client_t *client ) {
+   int clientfd = client->fd;
    float errorCode = -1;
 
    while ( TRUE ) {
@@ -167,7 +166,7 @@ void * handleRequest( /*client_t *client*/int clientfd ) {
          "Fecha [%04d%02d%02d%02d%02d%02d] Cliente [%s] [busqueda - %d - %d - %d]\n",
          localTime->tm_year + 1900, localTime->tm_mon + 1, localTime->tm_mday,
          localTime->tm_hour, localTime->tm_min, localTime->tm_sec,
-         inet_ntoa( clientInfo.sin_addr ),
+         inet_ntoa( client->socketInfo.sin_addr ),
          clientQuery.sourceId,
          clientQuery.destId,
          clientQuery.hourOfDay
@@ -180,5 +179,5 @@ void * handleRequest( /*client_t *client*/int clientfd ) {
    }
 
    close( clientfd );
-   //free( client );
+   free( client );
 }

@@ -1,3 +1,11 @@
+/**
+ * @file createHashTable.c
+ * @version 1.0
+ * @date 02/06/2021
+ * @author Jonathan López Castellanos - Víctor Alfredo Barragán Paez
+ * @title Programa createHashTable
+ * @brief Programa de utilidad empleado para crear el archivo de la tabla hash y los datos de los registros procesados, a partir del archivo suministrado por Uber.
+ */
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -14,6 +22,10 @@
 #define HOD 2
 #define MEAN_TRAV_TIME 3
 
+/**
+ * @brief freeLinkedList Función auxiliar empleada para liberar la memoria reservada para cada cada lista enlazada de la tabla hash en memoria.
+ * @param head Apuntador a un apuntador a la estructura record_t, la cabeza de la lista.
+ */
 void freeLinkedList ( record_t **head ) {
    record_t *tmp;
 
@@ -24,6 +36,11 @@ void freeLinkedList ( record_t **head ) {
    }
 }
 
+/**
+ * @brief addRecord Función empleada para añadir los datos de un registro en una lista enlazada de la tabla hash.
+ * @param list Apuntador a un apuntador a la estructura record_t, la cabeza de la lista.
+ * @param newRecord Variable de tipo record_t que contiene los datos del registro leído y a ser ingresados en la lista.
+ */
 void addRecord ( record_t **list, record_t newRecord ) {
 
    if ( *list == NULL ) {
@@ -42,7 +59,9 @@ void addRecord ( record_t **list, record_t newRecord ) {
    }
 }
 
-
+/**
+ * @brief main Función principal. Procesa el archivo suministrado por Uber y los almacena en un archivo binario, además de guardar las posiciones en dicho archivo del primer registro por id de origen (tabla hash).
+ */
 int main () {
 
    int totalNumRecords, attrRead, r;
