@@ -19,7 +19,7 @@
 #include "./search/searchRecord.h"
 
 #define PORT 3535
-#define BACKLOG 100
+#define BACKLOG 32
 #define MAX_CLIENTS 32
 
 /**
